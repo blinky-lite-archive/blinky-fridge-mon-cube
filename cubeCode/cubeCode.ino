@@ -2,46 +2,88 @@
 
 struct TransmitData
 {
-  int ledState = 0;
+  float avgRms;
+  float milliAmps = 0.0;
+  float power = 0.0;
+  float adcSampleRate = 0;
 };
 struct ReceiveData
 {
-  int ledOn = 1;
-  int ledToggle = 1;
-  int loopDelay = 2000;
+  int powerOn = 0;
+  float nsamples = 10000.0;
+  float avgRmsOffset = 0.0;
+  float adcTomA = 45.0;
+  int loopDelay = 1000;
 };
+const int powerOnPin = 21;
+const int powerOnLedPin = 4;
+const int currentMonPin = A0;
+const float acVolts = 240.0;
+float avgAdc = 0.0;
+float nsamples = 10000.0;
+float avgAdcPrev = -1.0;
 
-const int ledPin = 13;
 
 void setupPins()
 {
-  pinMode(ledPin, OUTPUT);    
-  digitalWrite(ledPin, LOW);
+  pinMode(powerOnPin, OUTPUT);
+  pinMode(powerOnLedPin, OUTPUT);
+  pinMode(currentMonPin, INPUT);
 }
 void processNewSetting(TransmitData* tData, ReceiveData* rData, ReceiveData* newData)
 {
-  rData->ledOn = newData->ledOn;
-  rData->ledToggle = newData->ledToggle;
+  rData->powerOn = newData->powerOn;
   rData->loopDelay = newData->loopDelay;
- }
+  rData->nsamples = newData->nsamples;
+  rData->avgRmsOffset = newData->avgRmsOffset;
+  rData->adcTomA = newData->adcTomA;
+  if (nsamples != rData->nsamples)
+  {
+    nsamples = rData->nsamples;
+    avgAdc = 0.0;
+    tData->avgRms = 0.0;
+    avgAdcPrev = -1.0;
+  }
+}
 boolean processData(TransmitData* tData, ReceiveData* rData)
 {
-  if(rData->ledToggle == 1)
-  {
-    tData->ledState = tData->ledState + 1; 
-    if (tData->ledState > 1) tData->ledState = 0;
+  float adcValue;
+  float rmsAdc;
+  int icnt = 0;
+  unsigned long tstart;
+  unsigned long tnow;
+
+  digitalWrite(powerOnPin, rData->powerOn);
+  digitalWrite(powerOnLedPin, rData->powerOn);
+
+  tstart = millis();
+  tnow = tstart;
+
+  while(((int) (tnow - tstart)) < rData->loopDelay)
+  { 
+    adcValue = (float) analogRead(currentMonPin);
+    avgAdc = avgAdc + (adcValue - avgAdc) / nsamples;
+    if(avgAdcPrev > 0.0)
+    {
+      rmsAdc = (adcValue - avgAdcPrev);
+      rmsAdc = rmsAdc * rmsAdc;
+      tData->avgRms = tData->avgRms + (rmsAdc - tData->avgRms) / nsamples;
+    }
+    ++icnt;
+    tnow = millis();
   }
-  else
-  {
-    tData->ledState = rData->ledOn;
-  }
-  digitalWrite(ledPin,  tData->ledState);
-  delay(rData->loopDelay);
+  avgAdcPrev = avgAdc;
+  tData->milliAmps = tData->avgRms - rData->avgRmsOffset;
+  if (tData->milliAmps < 0.0) tData->milliAmps = 0.0;
+  tData->milliAmps = sqrt(tData->milliAmps) * rData->adcTomA;
+  tData->power = tData->milliAmps * 0.001 * acVolts;
+  tData->adcSampleRate = ((float) icnt) / ((float) rData->loopDelay);
+
   return true;
 }
 
 const int microLEDPin = 13;
-const int commLEDPin = 2;
+const int commLEDPin = 5;
 boolean commLED = true;
 
 struct TXinfo
@@ -77,7 +119,7 @@ void setup()
   pinMode(microLEDPin, OUTPUT);    
   pinMode(commLEDPin, OUTPUT);  
   digitalWrite(commLEDPin, commLED);
-//  digitalWrite(microLEDPin, commLED);
+  digitalWrite(microLEDPin, commLED);
 
   sizeOfTx = sizeof(tx);
   sizeOfRx = sizeof(rx);
