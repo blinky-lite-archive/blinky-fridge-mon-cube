@@ -1,5 +1,4 @@
 #define BAUD_RATE 115200
-#define OMEGA 0.3141592654
 
 struct TransmitData
 {
