@@ -1,4 +1,5 @@
 #define BAUD_RATE 115200
+#define OMEGA 0.3141592654
 
 struct TransmitData
 {
@@ -10,39 +11,48 @@ struct TransmitData
 struct ReceiveData
 {
   int powerOn = 0;
-  float nsamples = 10000.0;
-  float avgRmsOffset = 0.0;
-  float adcTomA = 45.0;
+  float nsamples = 5000.0;
+  float avgRmsOffset = 0.015;
+  float adcTomA = 55.8;
   int loopDelay = 1000;
+  float nfilter = 30.0;
 };
 const int powerOnPin = 21;
 const int powerOnLedPin = 4;
 const int currentMonPin = A0;
 const float acVolts = 240.0;
 float avgAdc = 0.0;
-float nsamples = 10000.0;
-float avgAdcPrev = -1.0;
-
+float nsamples = 5000.0;
+float nfilter = 30.0;
+float nsamplesCnt = 1.0;
+float filteredAdc = 0.0;
+float nfilterCnt = 1.0;
+int oldPowerOn = 0.0;
 
 void setupPins()
 {
   pinMode(powerOnPin, OUTPUT);
   pinMode(powerOnLedPin, OUTPUT);
   pinMode(currentMonPin, INPUT);
+  digitalWrite(powerOnPin, 0);
 }
 void processNewSetting(TransmitData* tData, ReceiveData* rData, ReceiveData* newData)
 {
   rData->powerOn = newData->powerOn;
   rData->loopDelay = newData->loopDelay;
   rData->nsamples = newData->nsamples;
+  rData->nfilter = newData->nfilter;
   rData->avgRmsOffset = newData->avgRmsOffset;
   rData->adcTomA = newData->adcTomA;
-  if (nsamples != rData->nsamples)
+  if ((nsamples != rData->nsamples) || (nfilter != rData->nfilter))
   {
     nsamples = rData->nsamples;
-    avgAdc = 0.0;
+    nfilter = rData->nfilter;
+    avgAdc = 512.0;
+    filteredAdc = 512.0;
     tData->avgRms = 0.0;
-    avgAdcPrev = -1.0;
+    nsamplesCnt = 1.0;
+    nfilterCnt = 1.0;
   }
 }
 boolean processData(TransmitData* tData, ReceiveData* rData)
@@ -55,6 +65,15 @@ boolean processData(TransmitData* tData, ReceiveData* rData)
 
   digitalWrite(powerOnPin, rData->powerOn);
   digitalWrite(powerOnLedPin, rData->powerOn);
+  if (oldPowerOn != rData->powerOn)
+  {
+    avgAdc = 512.0;
+    filteredAdc = 512.0;
+    tData->avgRms = 0.0;
+    nsamplesCnt = 1.0;
+    nfilterCnt = 1.0;
+  }
+  oldPowerOn = rData->powerOn;
 
   tstart = millis();
   tnow = tstart;
@@ -62,22 +81,26 @@ boolean processData(TransmitData* tData, ReceiveData* rData)
   while(((int) (tnow - tstart)) < rData->loopDelay)
   { 
     adcValue = (float) analogRead(currentMonPin);
-    avgAdc = avgAdc + (adcValue - avgAdc) / nsamples;
-    if(avgAdcPrev > 0.0)
-    {
-      rmsAdc = (adcValue - avgAdcPrev);
-      rmsAdc = rmsAdc * rmsAdc;
-      tData->avgRms = tData->avgRms + (rmsAdc - tData->avgRms) / nsamples;
-    }
-    ++icnt;
+    filteredAdc = filteredAdc + (adcValue - filteredAdc) / nfilterCnt;
+    avgAdc = avgAdc + (adcValue - avgAdc) / nsamplesCnt;
+    rmsAdc = (filteredAdc - avgAdc);
+    rmsAdc = rmsAdc * rmsAdc;
+    tData->avgRms = tData->avgRms + (rmsAdc - tData->avgRms) / nsamplesCnt;
+     ++icnt;
+    if (nfilterCnt < nfilter) nfilterCnt = nfilterCnt + 1.0;
+    if (nsamplesCnt < nsamples) nsamplesCnt = nsamplesCnt + 1.0;
     tnow = millis();
   }
-  avgAdcPrev = avgAdc;
   tData->milliAmps = tData->avgRms - rData->avgRmsOffset;
   if (tData->milliAmps < 0.0) tData->milliAmps = 0.0;
   tData->milliAmps = sqrt(tData->milliAmps) * rData->adcTomA;
   tData->power = tData->milliAmps * 0.001 * acVolts;
   tData->adcSampleRate = ((float) icnt) / ((float) rData->loopDelay);
+  if (rData->powerOn == 0)
+  {
+    tData->milliAmps = 0.0;
+    tData->power = 0.0;
+  }
 
   return true;
 }
