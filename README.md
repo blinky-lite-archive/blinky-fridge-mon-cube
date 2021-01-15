@@ -1,1 +1,1 @@
-# off-n-on cube
+# blinky-power-relay-cube
