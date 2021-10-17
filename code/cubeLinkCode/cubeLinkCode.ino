@@ -137,8 +137,8 @@ boolean sendRequest(int idev)
       radioPacketRecv.iavg = 0;
       radioPacketRecv.irms = 0;
       radioPacketRecv.vbat = 0;
-      radioPacketRecv.itrip1 = 0;
-      radioPacketRecv.itrip2 = 0;
+      radioPacketRecv.itrip1 = 2;
+      radioPacketRecv.itrip2 = 2;
       radioPacketRecv.itemp = 0;
       radioPacketRecv.irssi = 0;
       
@@ -160,10 +160,12 @@ void wait(int milliSecs)
 {
   unsigned long beginTime = millis();
   unsigned long now = beginTime;
+  int bufLen = numDevices * deviceBufLen;
   while ((now - beginTime) < ((unsigned long) (milliSecs)) )
   {
     now = millis();
-    slave.poll( modbusBuffer, numDevices * deviceBufLen );
+    delay(10);
+    slave.poll( modbusBuffer,bufLen );
   }
   return;  
 }
