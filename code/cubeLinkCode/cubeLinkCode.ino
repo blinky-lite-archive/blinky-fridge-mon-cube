@@ -44,7 +44,7 @@ struct RadioPacketRecv
 RadioPacketRecv radioPacketRecv;
 uint8_t sizeOfRadioPacketRecv = sizeof(radioPacketRecv);
 
-Modbus slave(1,Serial1,0); // this is slave @1 and RS-232 or USB-FTDI
+Modbus slave(1,Serial,0); // this is slave @1 and RS-232 or USB-FTDI
 uint16_t deviceAddr[2] = {101, 101};
 int numDevices = 2;
 int deviceBufLen = 8;
@@ -71,7 +71,7 @@ void setup()
   digitalWrite(commLEDPin, LOW);
   for (int ii = 0; ii < numDevices * deviceBufLen; ++ii) modbusBuffer[ii] = 0;
 //  Serial.begin(9600);
-  Serial1.begin(9600); // baud-rate at 19200
+  Serial.begin(9600); // baud-rate at 19200
   slave.start();
 }
 void loop() 
