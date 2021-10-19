@@ -5,7 +5,7 @@
 #define RFM95_CS 8
 #define RFM95_RST 4
 #define RFM95_INT 3
-#define TIMEOUTMILLIS 5000
+#define TIMEOUTMILLIS 2000
 
 RH_RF95::ModemConfigChoice modeConfig[] = {
       RH_RF95::ModemConfigChoice::Bw125Cr45Sf128, 
@@ -45,7 +45,7 @@ RadioPacketRecv radioPacketRecv;
 uint8_t sizeOfRadioPacketRecv = sizeof(radioPacketRecv);
 
 Modbus slave(1,Serial,0); // this is slave @1 and RS-232 or USB-FTDI
-uint16_t deviceAddr[2] = {101, 101};
+uint16_t deviceAddr[2] = {101, 102};
 int numDevices = 2;
 int deviceBufLen = 8;
 uint16_t modbusBuffer[16];

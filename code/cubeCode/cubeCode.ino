@@ -36,7 +36,7 @@ float nfilterCnt = 1.0;
 int icnt = 0;
 struct RadioPacketSend
 {
-  uint16_t iaddr = 101;
+  uint16_t iaddr = 102;
   uint16_t vbat = 0;
   uint16_t iavg = 0;
   uint16_t irms = 0;
@@ -125,7 +125,7 @@ void loop()
         Serial.print(radioPacketSend.itemp);
         Serial.print(",");
         Serial.println(radioPacketSend.irssi);
- */   
+*/   
         delay(200);
         digitalWrite(commLEDPin, HIGH);
         rf95.send((uint8_t *)&radioPacketSend, sizeOfRadioPacketSend);
