@@ -1,3 +1,5 @@
+#define RF_FREQ  433.600
+#define BAUD_RATE  57600
 #include <SPI.h>
 #include "RH_RF95.h"
 #include "ModbusRtu.h"
@@ -6,6 +8,7 @@
 #define RFM95_RST 4
 #define RFM95_INT 3
 #define TIMEOUTMILLIS 2000
+#define MODBUS_POLL_INTERVAL 200
 
 RH_RF95::ModemConfigChoice modeConfig[] = {
       RH_RF95::ModemConfigChoice::Bw125Cr45Sf128, 
@@ -17,7 +20,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int sigPower = 20;
 int modemConfigIndex = 1;
-float rfFreq = 433.550;
+float rfFreq = RF_FREQ;
 
 const int commLEDPin = 13;
 
@@ -33,26 +36,26 @@ uint8_t sizeOfRadioPacketSend = sizeof(radioPacketSend);
 struct RadioPacketRecv
 {
   uint16_t iaddr = 0;
-  uint16_t vbat = 0;
-  uint16_t iavg = 0;
-  uint16_t irms = 0;
-  uint16_t itrip1 = 0;
-  uint16_t itrip2 = 0;
-  uint16_t itemp = 0;
   uint16_t irssi = 0;
+  uint16_t ideltat = 0;
+  uint16_t idata[11] = {0,0,0,0,0,0,0,0,0,0,0};
 };
 RadioPacketRecv radioPacketRecv;
 uint8_t sizeOfRadioPacketRecv = sizeof(radioPacketRecv);
 
+int numDevices = 8;
+int deviceBufLen = 14;
+int numData = 11;
+uint16_t modbusBuffer[113];
+int modbusBufferLength = 113;
+
+unsigned long lastModbusPollTime = 0;
+
 Modbus slave(1,Serial,0); // this is slave @1 and RS-232 or USB-FTDI
-uint16_t deviceAddr[2] = {101, 102};
-int numDevices = 2;
-int deviceBufLen = 8;
-uint16_t modbusBuffer[16];
-int waitBetweenDevices = 3000;
 
 void setup() 
 {
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
   delay(100);
@@ -69,30 +72,41 @@ void setup()
 
   pinMode(commLEDPin, OUTPUT);
   digitalWrite(commLEDPin, LOW);
-  for (int ii = 0; ii < numDevices * deviceBufLen; ++ii) modbusBuffer[ii] = 0;
-//  Serial.begin(9600);
-  Serial.begin(9600); // baud-rate at 19200
+  modbusBuffer[0] = 0;
+  for (int ii = 0; ii < numDevices * deviceBufLen; ++ii) modbusBuffer[ii + 1] = 0;
+//  modbusBuffer[0] = 3000; //waitBetweenDevices
+//  modbusBuffer[1] = 102; //first device address
+   
+  Serial.begin(BAUD_RATE);
   slave.start();
 }
 void loop() 
 {
-  for (int ii = 0; ii < numDevices; ++ii)
+  int deviceAddressIndex = 0;
+  if (modbusBuffer[0] > 0)
   {
-    wait(waitBetweenDevices);
-    if (!sendRequest(ii))
+    for (int ii = 0; ii < numDevices; ++ii)
     {
-//      Serial.println("Booger");
+      deviceAddressIndex = ii * deviceBufLen + 1;
+      if (modbusBuffer[deviceAddressIndex] > 0)
+      {
+        if (!sendRequest(deviceAddressIndex))
+        {
+        }
+        wait(modbusBuffer[0]);
+      }
     }
   }
+  checkModbusRequest();
+
 }
-boolean sendRequest(int idev)
+boolean sendRequest(int deviceAddressIndex)
 {
   boolean waitForData = true;
   boolean timeOut = false;
   unsigned long lastWriteTime = millis();
-  int bufferStart = idev * deviceBufLen;
 
-  radioPacketSend.iaddr = deviceAddr[idev];
+  radioPacketSend.iaddr = modbusBuffer[deviceAddressIndex];
   radioPacketSend.msgTime = millis();
   digitalWrite(commLEDPin, HIGH);
   rf95.send((uint8_t *)&radioPacketSend, sizeOfRadioPacketSend);
@@ -105,6 +119,7 @@ boolean sendRequest(int idev)
 
   while (waitForData && !timeOut)
   {
+    checkModbusRequest();
     while (rf95.available())
     {
       if (rf95.recv((uint8_t *)&radioPacketRecv, &sizeOfRadioPacketRecv))
@@ -112,47 +127,27 @@ boolean sendRequest(int idev)
         if (radioPacketRecv.iaddr == radioPacketSend.iaddr)
         {
           waitForData = false;
-/*
-          Serial.print(radioPacketRecv.iavg);
-          Serial.print(",");
-          Serial.print(radioPacketRecv.irms);
-          Serial.print(",");
-          Serial.print(radioPacketRecv.vbat);
-          Serial.print(",");
-          Serial.print(radioPacketRecv.itrip1);
-          Serial.print(",");
-          Serial.print(radioPacketRecv.itrip2);
-          Serial.print(",");
-          Serial.print(radioPacketRecv.itemp);
-          Serial.print(",");
-          Serial.println(radioPacketRecv.irssi);
-*/
         }
       }
     }
     if ((millis() - lastWriteTime) > TIMEOUTMILLIS)
     {
       timeOut = true;
-      radioPacketRecv.iaddr = deviceAddr[idev];
-      radioPacketRecv.iavg = 0;
-      radioPacketRecv.irms = 0;
-      radioPacketRecv.vbat = 0;
-      radioPacketRecv.itrip1 = 2;
-      radioPacketRecv.itrip2 = 2;
-      radioPacketRecv.itemp = 0;
+      radioPacketRecv.iaddr = modbusBuffer[deviceAddressIndex];
       radioPacketRecv.irssi = 0;
-      
+      radioPacketRecv.ideltat = 0;
+      for (int ii = 0; ii < numData; ++ii)
+      {
+        radioPacketRecv.idata[ii] = 0;
+      }
     }
 
-    modbusBuffer[bufferStart + 0] = radioPacketRecv.iaddr;
-    modbusBuffer[bufferStart + 1] = radioPacketRecv.iavg;
-    modbusBuffer[bufferStart + 2] = radioPacketRecv.irms;
-    modbusBuffer[bufferStart + 3] = radioPacketRecv.vbat;
-    modbusBuffer[bufferStart + 4] = radioPacketRecv.itrip1;
-    modbusBuffer[bufferStart + 5] = radioPacketRecv.itrip2;
-    modbusBuffer[bufferStart + 6] = radioPacketRecv.itemp;
-    modbusBuffer[bufferStart + 7] = radioPacketRecv.irssi;
-
+    modbusBuffer[deviceAddressIndex + 1] = radioPacketRecv.irssi;
+    modbusBuffer[deviceAddressIndex + 2] = radioPacketRecv.ideltat;
+    for (int ii = 0; ii < numData; ++ii)
+    {
+      modbusBuffer[deviceAddressIndex + 3 + ii] = radioPacketRecv.idata[ii];
+    }
   }
   return !timeOut;
 }
@@ -160,12 +155,20 @@ void wait(int milliSecs)
 {
   unsigned long beginTime = millis();
   unsigned long now = beginTime;
-  int bufLen = numDevices * deviceBufLen;
   while ((now - beginTime) < ((unsigned long) (milliSecs)) )
   {
     now = millis();
-    delay(10);
-    slave.poll( modbusBuffer,bufLen );
+    checkModbusRequest();
   }
   return;  
+}
+void checkModbusRequest()
+{
+  unsigned long now = millis();
+  if ((now - lastModbusPollTime) > MODBUS_POLL_INTERVAL)
+  {
+    lastModbusPollTime = now;
+    slave.poll( modbusBuffer,modbusBufferLength );
+  }
+  return;
 }

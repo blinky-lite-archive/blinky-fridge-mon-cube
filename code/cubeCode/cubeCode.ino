@@ -1,3 +1,14 @@
+#define DEV_ADDR 102
+#define RF_FREQ  433.600
+/*
+ * idata[0] = trip1
+ * idata[1] = trip2
+ * idata[2] = temp raw
+ * idata[3] = current offset raw * 32
+ * idata[4] = current stdev raw  * 32
+ * idata[5] = current rmsMax * 32
+ * idata[6] = current rmsAvg over int  * 32
+ */
 #include <SPI.h>
 #include "RH_RF95.h"
 
@@ -15,7 +26,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int sigPower = 20;
 int modemConfigIndex = 1;
-float rfFreq = 433.550;
+float rfFreq = RF_FREQ;
 
 const int currentMonPin = A0;
 const int vbatPin = A7;
@@ -34,16 +45,15 @@ float nfilter = 5.0;
 float filteredAdc = 0.0;
 float nfilterCnt = 1.0;
 int icnt = 0;
+float rmsMax = 0.0;
+float rmsSum = 0.0;
+float rmsCnt = 0.0;
 struct RadioPacketSend
 {
-  uint16_t iaddr = 102;
-  uint16_t vbat = 0;
-  uint16_t iavg = 0;
-  uint16_t irms = 0;
-  uint16_t itrip1 = 0;
-  uint16_t itrip2 = 0;
-  uint16_t itemp = 0;
+  uint16_t iaddr = DEV_ADDR;
   uint16_t irssi = 0;
+  uint16_t ideltat = 0;
+  uint16_t idata[11] = {0,0,0,0,0,0,0,0,0,0,0};
 };
 RadioPacketSend radioPacketSend;
 uint8_t sizeOfRadioPacketSend = sizeof(radioPacketSend);
@@ -55,6 +65,9 @@ struct RadioPacketRecv
 };
 RadioPacketRecv radioPacketRecv;
 uint8_t sizeOfRadioPacketRecv = sizeof(radioPacketRecv);
+
+unsigned long tnow;
+unsigned long tsent;
 
 void setup() 
 {
@@ -79,15 +92,19 @@ void setup()
   pinMode(trip2Pin, INPUT);
   pinMode(tempPin, INPUT);
   digitalWrite(commLEDPin, LOW);
+
+  tnow  = millis();
+  tsent = tnow;
 //  Serial.begin(9600);
+//  delay(5000);
   
 }
 void loop() 
 {
-  radioPacketSend.vbat = (uint16_t) analogRead(vbatPin);
-  radioPacketSend.itrip1 = (uint16_t) digitalRead(trip1Pin);
-  radioPacketSend.itrip2 = (uint16_t) digitalRead(trip2Pin);
-  radioPacketSend.itemp = (uint16_t) analogRead(tempPin);
+  float frms = 0.0;
+  radioPacketSend.idata[0] = (uint16_t) digitalRead(trip1Pin);
+  radioPacketSend.idata[1] = (uint16_t) digitalRead(trip2Pin);
+  radioPacketSend.idata[2] = (uint16_t) analogRead(tempPin);
   
   adcValue = (float) analogRead(currentMonPin);
   filteredAdc = filteredAdc + (adcValue - filteredAdc) / nfilterCnt;
@@ -98,8 +115,13 @@ void loop()
   if (nsamplesCnt < nsamples) nsamplesCnt = nsamplesCnt + 1.0;
   if (nfilterCnt < nfilter) nfilterCnt = nfilterCnt + 1.0;
  
-  radioPacketSend.iavg = (uint16_t) (avgAdc * 100.0);
-  radioPacketSend.irms = (uint16_t) (sqrt(avgRms) * 100.0);
+  frms = 32.0 * sqrt(avgRms);
+  if (rmsMax < frms ) rmsMax = frms;
+  rmsSum = rmsSum + frms;
+  rmsCnt = rmsCnt + 1;
+  
+  radioPacketSend.idata[3] = (uint16_t) (32.0 * avgAdc);
+  radioPacketSend.idata[4] = (uint16_t) frms;
 
   while (rf95.available())
   {
@@ -108,24 +130,17 @@ void loop()
       if (radioPacketRecv.iaddr == radioPacketSend.iaddr)
       {
         
-        radioPacketSend.irssi = (uint16_t) (-rf95.lastRssi());
+        radioPacketSend.irssi = (uint16_t) rf95.lastRssi();
+        tnow  = millis();
+        radioPacketSend.ideltat = (uint16_t) ((tnow - tsent) / 100); // 0.1 secs
+        tsent = tnow;
+        if (rmsCnt > 1.0) rmsSum = rmsSum / rmsCnt;
+        radioPacketSend.idata[5] = (uint16_t) rmsMax;
+        radioPacketSend.idata[6] = (uint16_t) rmsSum;
+        rmsMax = 0.0;
+        rmsSum = 0.0;
+        rmsCnt = 0.0;
         
-/*
-        Serial.println(radioPacketRecv.msgTime);
-        Serial.print(radioPacketSend.iavg);
-        Serial.print(",");
-        Serial.print(radioPacketSend.irms);
-        Serial.print(",");
-        Serial.print(radioPacketSend.vbat);
-        Serial.print(",");
-        Serial.print(radioPacketSend.itrip1);
-        Serial.print(",");
-        Serial.print(radioPacketSend.itrip2);
-        Serial.print(",");
-        Serial.print(radioPacketSend.itemp);
-        Serial.print(",");
-        Serial.println(radioPacketSend.irssi);
-*/   
         delay(200);
         digitalWrite(commLEDPin, HIGH);
         rf95.send((uint8_t *)&radioPacketSend, sizeOfRadioPacketSend);
