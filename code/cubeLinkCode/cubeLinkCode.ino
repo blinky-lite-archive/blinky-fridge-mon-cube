@@ -19,7 +19,7 @@ RH_RF95::ModemConfigChoice modeConfig[] = {
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int sigPower = 20;
-int modemConfigIndex = 1;
+int modemConfigIndex = 0;
 float rfFreq = RF_FREQ;
 
 const int commLEDPin = 13;
@@ -74,8 +74,10 @@ void setup()
   digitalWrite(commLEDPin, LOW);
   modbusBuffer[0] = 0;
   for (int ii = 0; ii < numDevices * deviceBufLen; ++ii) modbusBuffer[ii + 1] = 0;
-//  modbusBuffer[0] = 3000; //waitBetweenDevices
+
+//  modbusBuffer[0] = 10000; //waitBetweenDevices
 //  modbusBuffer[1] = 102; //first device address
+//  Serial.begin(9600);
    
   Serial.begin(BAUD_RATE);
   slave.start();
@@ -141,14 +143,22 @@ boolean sendRequest(int deviceAddressIndex)
         radioPacketRecv.idata[ii] = 0;
       }
     }
-
-    modbusBuffer[deviceAddressIndex + 1] = radioPacketRecv.irssi;
-    modbusBuffer[deviceAddressIndex + 2] = radioPacketRecv.ideltat;
-    for (int ii = 0; ii < numData; ++ii)
-    {
-      modbusBuffer[deviceAddressIndex + 3 + ii] = radioPacketRecv.idata[ii];
-    }
   }
+
+  modbusBuffer[deviceAddressIndex + 1] = radioPacketRecv.irssi;
+  modbusBuffer[deviceAddressIndex + 2] = radioPacketRecv.ideltat;
+  for (int ii = 0; ii < numData; ++ii)
+  {
+    modbusBuffer[deviceAddressIndex + 3 + ii] = radioPacketRecv.idata[ii];
+  }
+/*
+  for (int ii = 0; ii < deviceBufLen; ++ii)
+  {
+    Serial.print(modbusBuffer[deviceAddressIndex + ii]);
+    Serial.print(", ");
+  }
+  Serial.println(" ");
+*/
   return !timeOut;
 }
 void wait(int milliSecs)

@@ -25,7 +25,7 @@ RH_RF95::ModemConfigChoice modeConfig[] = {
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 int sigPower = 20;
-int modemConfigIndex = 1;
+int modemConfigIndex = 0;
 float rfFreq = RF_FREQ;
 
 const int currentMonPin = A0;
