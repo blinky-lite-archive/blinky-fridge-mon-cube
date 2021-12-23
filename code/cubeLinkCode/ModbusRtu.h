@@ -143,7 +143,7 @@ const unsigned char fctsupported[] =
 };
 
 #define T35  5
-#define  MAX_BUFFER  256	//!< maximum size for the communication buffer in bytes
+#define  MAX_BUFFER  64	//!< maximum size for the communication buffer in bytes
 
 /**
  * @class Modbus

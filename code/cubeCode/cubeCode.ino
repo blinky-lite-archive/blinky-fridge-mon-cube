@@ -1,5 +1,5 @@
-#define DEV_ADDR 102
-#define RF_FREQ  433.600
+#define DEV_ADDR 101
+#define RF_FREQ  433.200
 /*
  * idata[0] = trip1
  * idata[1] = trip2
