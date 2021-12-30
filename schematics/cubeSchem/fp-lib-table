@@ -2,4 +2,5 @@
   (lib (name dmcginnis427Footprints)(type KiCad)(uri ${KIPRJMOD}/Library/dmcginnis427Footprints)(options "")(descr ""))
   (lib (name IRM-20-5)(type KiCad)(uri ${KIPRJMOD}/Library/IRM-20-5)(options "")(descr ""))
   (lib (name FEATHER_M0_BASIC_PROTO)(type KiCad)(uri ${KIPRJMOD}/Library/FEATHER_M0_BASIC_PROTO)(options "")(descr ""))
+  (lib (name MCP1700-3302E_TO)(type KiCad)(uri ${KIPRJMOD}/Library/MCP1700-3302E_TO)(options "")(descr ""))
 )
