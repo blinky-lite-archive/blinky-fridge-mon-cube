@@ -1,1 +1,1 @@
-# blinky-power-relay-cube
+# blinky-refrig-mon-cube
