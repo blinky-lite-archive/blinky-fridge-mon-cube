@@ -9,6 +9,8 @@
 #define trip1Pin 5
 #define trip2Pin 6
 #define reedPin 18
+#define currentMonPin A0
+#define vbatPin A7
 
 #include "Adafruit_MAX31865.h"
 
@@ -24,7 +26,6 @@ RH_RF95::ModemConfigChoice modeConfig[] = {
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 Adafruit_MAX31865 thermo = Adafruit_MAX31865(10, 11, 12, 13);
-
 
 int sigPower = 20;
 int modemConfigIndex = 0;
@@ -50,6 +51,20 @@ uint8_t sizeOfRadioPacketRecv = sizeof(radioPacketRecv);
 unsigned long tnow;
 unsigned long tsent;
 
+float avgAdc = 0.0;
+float nsamples = 5000.0;
+float nsamplesCnt = 1.0;
+float avgRms = 0.0;
+float adcValue;
+float rmsAdc;
+float nfilter = 5.0;
+float filteredAdc = 0.0;
+float nfilterCnt = 1.0;
+int icnt = 0;
+float rmsMax = 0.0;
+float rmsSum = 0.0;
+float rmsCnt = 0.0;
+
 void setup() 
 {
   Serial.begin(9600);
@@ -73,6 +88,8 @@ void setup()
   pinMode(trip1Pin, INPUT);
   pinMode(trip2Pin, INPUT);
   pinMode(reedPin, INPUT);
+  pinMode(currentMonPin, INPUT);
+  pinMode(vbatPin, INPUT);
 
   digitalWrite(commLEDPin, LOW);
   tnow  = millis();
@@ -83,6 +100,23 @@ void setup()
 
 void loop() 
 {
+  float frms = 0.0;
+  adcValue = (float) analogRead(currentMonPin);
+  filteredAdc = filteredAdc + (adcValue - filteredAdc) / nfilterCnt;
+  avgAdc = avgAdc + (adcValue - avgAdc) / nsamplesCnt;
+  rmsAdc = (filteredAdc - avgAdc);
+  rmsAdc = rmsAdc * rmsAdc;
+  avgRms = avgRms + (rmsAdc - avgRms) / nsamplesCnt;
+  if (nsamplesCnt < nsamples) nsamplesCnt = nsamplesCnt + 1.0;
+  if (nfilterCnt < nfilter) nfilterCnt = nfilterCnt + 1.0;
+ 
+  frms = 32.0 * sqrt(avgRms);
+  if (rmsMax < frms ) rmsMax = frms;
+  rmsSum = rmsSum + frms;
+  rmsCnt = rmsCnt + 1;
+  
+  radioPacketSend.idata[3] = (uint16_t) (32.0 * avgAdc);
+  radioPacketSend.idata[4] = (uint16_t) frms;
 
   while (rf95.available())
   {
@@ -94,9 +128,13 @@ void loop()
         radioPacketSend.idata[0] = (uint16_t) digitalRead(trip1Pin);
         radioPacketSend.idata[1] = (uint16_t) digitalRead(trip2Pin);
         radioPacketSend.idata[2] = readTemperature();
-        radioPacketSend.idata[3] = (uint16_t) 16384;
-        radioPacketSend.idata[4] = 10;
+        radioPacketSend.idata[5] = (uint16_t) rmsMax;
+        radioPacketSend.idata[6] = (uint16_t) rmsSum;
         radioPacketSend.idata[7] = (uint16_t) digitalRead(reedPin);
+        radioPacketSend.idata[8] = (uint16_t) analogRead(vbatPin);
+        rmsMax = 0.0;
+        rmsSum = 0.0;
+        rmsCnt = 0.0;
         for (int ii = 0; ii < 10; ++ii)
         {
           Serial.print(radioPacketSend.idata[ii]);
