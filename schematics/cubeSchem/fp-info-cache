@@ -1,4 +1,4 @@
-16928085710800058
+16931378833834058
 Battery
 BatteryHolder_Bulgin_BX0036_1xC
 Bulgin Battery Holder, BX0036, Battery Type C (https://www.bulgin.com/products/pub/media/bulgin/data/Battery_holders.pdf)
@@ -46029,8 +46029,8 @@ MODULE_FEATHER_M0_BASIC_PROTO
 
 
 0
-30
-30
+28
+28
 Ferrite_THT
 LairdTech_28C0236-0JW-10
 Ferrite, vertical, LairdTech 28C0236-0JW-10, https://assets.lairdtech.com/home/brandworld/files/28C0236-0JW-10.pdf, JW Miller core https://www.bourns.com/products/magnetic-products/j.w.-miller-through-hole-ferrite-beads-emi-filters
@@ -75250,6 +75250,13 @@ Lipo1500
 0
 0
 dmcginnis427Footprints
+Lipo1500_bs
+
+
+0
+0
+0
+dmcginnis427Footprints
 PowerFeather
 
 
@@ -75286,6 +75293,13 @@ blmcLogo
 0
 dmcginnis427Footprints
 blmcLogo2
+
+
+0
+0
+0
+dmcginnis427Footprints
+blmcLogo2_bs
 
 
 0
