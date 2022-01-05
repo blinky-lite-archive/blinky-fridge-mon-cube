@@ -1,6 +1,4 @@
 (sym_lib_table
   (lib (name dmcginnis427)(type Legacy)(uri ${KIPRJMOD}/Library/dmcginnis427Symbols/dmcginnis427.lib)(options "")(descr ""))
   (lib (name IRM-20-5)(type Legacy)(uri ${KIPRJMOD}/Library/IRM-20-5/IRM-20-5.lib)(options "")(descr ""))
-  (lib (name FEATHER_M0_BASIC_PROTO)(type Legacy)(uri ${KIPRJMOD}/Library/FEATHER_M0_BASIC_PROTO/FEATHER_M0_BASIC_PROTO.lib)(options "")(descr ""))
-  (lib (name MCP1700-3302E_TO)(type Legacy)(uri ${KIPRJMOD}/Library/MCP1700-3302E_TO/MCP1700-3302E_TO.lib)(options "")(descr ""))
 )
